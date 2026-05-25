@@ -19,31 +19,56 @@ LOG_DIR = os.path.join(BUILD_DIR, 'log')
 PID_FILE = os.path.join(LOG_DIR, 'backend.pid')
 LOG_FILE = os.path.join(LOG_DIR, 'backend.log')
 
-@task
-def clean(c):
-    """Clean all build directories, caches, and node_modules"""
+@task(help={
+    'backend': "Clean only backend build files and outputs",
+    'frontend': "Clean only frontend build caches and node_modules",
+    'logs': "Clean log files as well (default: True)"
+})
+def clean(c, backend=False, frontend=False, logs=True):
+    """Clean build directories, caches, and optionally logs"""
+    # If neither is specified, default to cleaning both
+    if not backend and not frontend:
+        backend = True
+        frontend = True
+
     print("🧹 Cleaning project files...")
-    
-    # 1. Clean root _build folder
-    if os.path.exists(BUILD_DIR):
+
+    # Clean backend-specific build outputs
+    if backend:
+        # Clean backend CMake build directory
+        backend_build = os.path.join(BACKEND_DIR, 'build')
+        if os.path.exists(backend_build):
+            c.run(f"rm -rf {backend_build}")
+            print("  ✓ Cleaned backend temp build directory.")
+
+        # Clean output and test folders (excluding log directory)
+        if os.path.exists(OUT_DIR):
+            c.run(f"rm -rf {OUT_DIR}")
+            print("  ✓ Cleaned backend build output directory (_build/out).")
+        if os.path.exists(TEST_DIR):
+            c.run(f"rm -rf {TEST_DIR}")
+            print("  ✓ Cleaned backend test output directory (_build/test).")
+
+    # Clean frontend-specific cache/modules
+    if frontend:
+        next_dir = os.path.join(FRONTEND_DIR, '.next')
+        node_dir = os.path.join(FRONTEND_DIR, 'node_modules')
+        if os.path.exists(next_dir):
+            c.run(f"rm -rf {next_dir}")
+            print("  ✓ Cleaned frontend Next.js cache (.next).")
+        if os.path.exists(node_dir):
+            c.run(f"rm -rf {node_dir}")
+            print("  ✓ Cleaned frontend node_modules.")
+
+    # Clean logs if specified
+    if logs:
+        if os.path.exists(LOG_DIR):
+            c.run(f"rm -rf {LOG_DIR}")
+            print("  ✓ Cleaned log directory (_build/log).")
+
+    # Clean root _build if it ends up completely empty
+    if os.path.exists(BUILD_DIR) and not os.listdir(BUILD_DIR):
         c.run(f"rm -rf {BUILD_DIR}")
-        print("  ✓ Cleaned root _build directory (out, test, log).")
-
-    # 2. Clean backend build folder
-    backend_build = os.path.join(BACKEND_DIR, 'build')
-    if os.path.exists(backend_build):
-        c.run(f"rm -rf {backend_build}")
-        print("  ✓ Cleaned backend temp build directory.")
-
-    # 3. Clean frontend caches
-    next_dir = os.path.join(FRONTEND_DIR, '.next')
-    node_dir = os.path.join(FRONTEND_DIR, 'node_modules')
-    if os.path.exists(next_dir):
-        c.run(f"rm -rf {next_dir}")
-        print("  ✓ Cleaned frontend Next.js cache.")
-    if os.path.exists(node_dir):
-        c.run(f"rm -rf {node_dir}")
-        print("  ✓ Cleaned frontend node_modules.")
 
     print("✓ Project cleaned successfully.")
 
@@ -108,6 +133,10 @@ def rebuild(c, backend=False, frontend=False):
     print("🔄 Starting rebuild process...")
     # Stop services first
     stop(c)
+    print("")
+
+    # Clean specified components, but preserve logs
+    clean(c, backend=backend, frontend=frontend, logs=False)
     print("")
 
     # Build specified components
