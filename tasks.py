@@ -229,6 +229,12 @@ def status(c):
 def test(c):
     """Run all compiled test suites in _build/test, piping output to _build/log"""
     print("🧪 Running osxmon C++ test suites...")
+    
+    # Check if backend is running (which can cause port conflicts/failures in test suites)
+    if os.path.exists(PID_FILE):
+        print("⚠️  Warning: C++ Backend appears to be running. Some test suites (like ClientRetryTest) may fail due to port conflicts.")
+        print("💡 Suggestion: Run 'inv stop' before running tests for a clean environment.\n")
+
     os.makedirs(LOG_DIR, exist_ok=True)
     
     if not os.path.exists(TEST_DIR):
