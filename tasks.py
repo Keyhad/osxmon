@@ -47,41 +47,71 @@ def clean(c):
 
     print("✓ Project cleaned successfully.")
 
-@task
-def build(c):
-    """Compile C++ backend and build Next.js Docker image, piping build logs to _build/log"""
+@task(help={
+    'backend': "Build only the native C++ backend",
+    'frontend': "Build only the frontend Docker image"
+})
+def build(c, backend=False, frontend=False):
+    """Compile C++ backend and/or build Next.js Docker image, piping build logs to _build/log"""
+    # If neither is specified, default to building both
+    if not backend and not frontend:
+        backend = True
+        frontend = True
+
     print("🏗️  Building osxmon project...")
     os.makedirs(LOG_DIR, exist_ok=True)
 
-    # 1. Compile C++ Backend Natively
-    print("\n[1/2] Compiling C++ Oat++ Backend natively on macOS...")
-    backend_build_dir = os.path.join(BACKEND_DIR, 'build')
-    os.makedirs(backend_build_dir, exist_ok=True)
-    
-    cfg_log = os.path.join(LOG_DIR, 'build_backend_configure.log')
-    compile_log = os.path.join(LOG_DIR, 'build_backend_compile.log')
-    
-    with c.cd(BACKEND_DIR):
-        print(f"  - Running CMake configure... (logging to _build/log/build_backend_configure.log)")
-        c.run(f"cmake -B build -S . > {cfg_log} 2>&1")
-        print(f"  - Compiling C++ binary...     (logging to _build/log/build_backend_compile.log)")
-        c.run(f"cmake --build build -j$(sysctl -n hw.ncpu) > {compile_log} 2>&1")
-    
-    # Check if build was successful and placed in _build/out
-    binary_path = os.path.join(OUT_DIR, 'osxmon_server')
-    if os.path.exists(binary_path):
-        print("  ✓ C++ Backend built successfully in '_build/out/osxmon_server'.")
-    else:
-        print(f"  ❌ Error: C++ compilation failed. Inspect build log: {compile_log}")
-        sys.exit(1)
+    if backend:
+        # 1. Compile C++ Backend Natively
+        print("\nCompiling C++ Oat++ Backend natively on macOS...")
+        backend_build_dir = os.path.join(BACKEND_DIR, 'build')
+        os.makedirs(backend_build_dir, exist_ok=True)
+        
+        cfg_log = os.path.join(LOG_DIR, 'build_backend_configure.log')
+        compile_log = os.path.join(LOG_DIR, 'build_backend_compile.log')
+        
+        with c.cd(BACKEND_DIR):
+            print(f"  - Running CMake configure... (logging to _build/log/build_backend_configure.log)")
+            c.run(f"cmake -B build -S . > {cfg_log} 2>&1")
+            print(f"  - Compiling C++ binary...     (logging to _build/log/build_backend_compile.log)")
+            c.run(f"cmake --build build -j$(sysctl -n hw.ncpu) > {compile_log} 2>&1")
+        
+        # Check if build was successful and placed in _build/out
+        binary_path = os.path.join(OUT_DIR, 'osxmon_server')
+        if os.path.exists(binary_path):
+            print("  ✓ C++ Backend built successfully in '_build/out/osxmon_server'.")
+        else:
+            print(f"  ❌ Error: C++ compilation failed. Inspect build log: {compile_log}")
+            sys.exit(1)
 
-    # 2. Build Frontend Docker Container
-    frontend_log = os.path.join(LOG_DIR, 'build_frontend.log')
-    print(f"\n[2/2] Building frontend Next.js Docker image... (logging to _build/log/build_frontend.log)")
-    with c.cd(ROOT_DIR):
-        c.run(f"docker compose build > {frontend_log} 2>&1")
-    print("  ✓ Frontend Docker image built successfully.")
+    if frontend:
+        # 2. Build Frontend Docker Container
+        frontend_log = os.path.join(LOG_DIR, 'build_frontend.log')
+        print(f"\nBuilding frontend Next.js Docker image... (logging to _build/log/build_frontend.log)")
+        with c.cd(ROOT_DIR):
+            c.run(f"docker compose build > {frontend_log} 2>&1")
+        print("  ✓ Frontend Docker image built successfully.")
+
     print("\n🎉 Build complete! Run 'inv start' to launch the dashboard.")
+
+@task(help={
+    'backend': "Rebuild only the native C++ backend",
+    'frontend': "Rebuild only the frontend Docker image"
+})
+def rebuild(c, backend=False, frontend=False):
+    """Stop running services and rebuild backend, frontend, or both"""
+    # If neither is specified, default to rebuilding both
+    if not backend and not frontend:
+        backend = True
+        frontend = True
+
+    print("🔄 Starting rebuild process...")
+    # Stop services first
+    stop(c)
+    print("")
+
+    # Build specified components
+    build(c, backend=backend, frontend=frontend)
 
 @task(help={
     'verbose': "Enable verbose logging for the C++ backend",
