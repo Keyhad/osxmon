@@ -90,10 +90,15 @@ Starts the C++ backend daemon on the host and boots the containerized Next.js fr
 ```bash
 ./.venv/bin/invoke start
 ```
+You can customize the backend logging level by passing options:
+```bash
+./.venv/bin/invoke start --verbose           # Or -v: Enable verbose/debug logs
+./.venv/bin/invoke start --log-level debug   # Or -l debug: Select log level (verbose, debug, info, warning, error)
+```
 *   **Frontend URL**: [http://localhost:3000](http://localhost:3000)
 *   **Swagger API UI Docs**: [http://localhost:8000/swagger/ui](http://localhost:8000/swagger/ui)
 *   **OpenAPI JSON Specification**: [http://localhost:8000/api-docs/oas-3.0.0.json](http://localhost:8000/api-docs/oas-3.0.0.json)
-*   **Log Output**: Server daemon outputs are saved directly to `_build/log/backend.log` and PID to `_build/log/backend.pid`.
+*   **Log Output**: Server daemon outputs are saved directly to `_build/log/backend.log` and PID to `_build/log/backend.pid`. When request logging is enabled (e.g., at `info`, `debug`, or `verbose` levels), incoming requests are logged.
 
 ### Check Uptime Status
 Verify that both backend and frontend layers are active:
