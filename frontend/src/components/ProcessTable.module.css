@@ -1,0 +1,122 @@
+.tableContainer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.tableTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  max-width: 320px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.processTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.processTable th {
+  padding: 10px 16px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.processTable th:hover {
+  color: var(--text-primary);
+}
+
+.sortIcon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+}
+
+.processTable td {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.processRow {
+  transition: background 0.15s;
+}
+
+.processRow:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pidCell {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  width: 80px;
+}
+
+.nameCell {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.cpuCell {
+  font-family: var(--font-mono);
+  color: var(--color-cpu);
+  font-weight: 600;
+  width: 100px;
+}
+
+.memCell {
+  font-family: var(--font-mono);
+  color: var(--color-memory);
+  width: 120px;
+}
+
+.noResults {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

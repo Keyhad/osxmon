@@ -1,0 +1,265 @@
+import os
+import sys
+import time
+import signal
+import subprocess
+from invoke import task
+
+# Paths
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.join(ROOT_DIR, 'backend')
+FRONTEND_DIR = os.path.join(ROOT_DIR, 'frontend')
+
+# Output directories
+BUILD_DIR = os.path.join(ROOT_DIR, '_build')
+OUT_DIR = os.path.join(BUILD_DIR, 'out')
+TEST_DIR = os.path.join(BUILD_DIR, 'test')
+LOG_DIR = os.path.join(BUILD_DIR, 'log')
+
+PID_FILE = os.path.join(LOG_DIR, 'backend.pid')
+LOG_FILE = os.path.join(LOG_DIR, 'backend.log')
+
+@task
+def clean(c):
+    """Clean all build directories, caches, and node_modules"""
+    print("🧹 Cleaning project files...")
+    
+    # 1. Clean root _build folder
+    if os.path.exists(BUILD_DIR):
+        c.run(f"rm -rf {BUILD_DIR}")
+        print("  ✓ Cleaned root _build directory (out, test, log).")
+
+    # 2. Clean backend build folder
+    backend_build = os.path.join(BACKEND_DIR, 'build')
+    if os.path.exists(backend_build):
+        c.run(f"rm -rf {backend_build}")
+        print("  ✓ Cleaned backend temp build directory.")
+
+    # 3. Clean frontend caches
+    next_dir = os.path.join(FRONTEND_DIR, '.next')
+    node_dir = os.path.join(FRONTEND_DIR, 'node_modules')
+    if os.path.exists(next_dir):
+        c.run(f"rm -rf {next_dir}")
+        print("  ✓ Cleaned frontend Next.js cache.")
+    if os.path.exists(node_dir):
+        c.run(f"rm -rf {node_dir}")
+        print("  ✓ Cleaned frontend node_modules.")
+
+    print("✓ Project cleaned successfully.")
+
+@task
+def build(c):
+    """Compile C++ backend and build Next.js Docker image, piping build logs to _build/log"""
+    print("🏗️  Building osxmon project...")
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    # 1. Compile C++ Backend Natively
+    print("\n[1/2] Compiling C++ Oat++ Backend natively on macOS...")
+    backend_build_dir = os.path.join(BACKEND_DIR, 'build')
+    os.makedirs(backend_build_dir, exist_ok=True)
+    
+    cfg_log = os.path.join(LOG_DIR, 'build_backend_configure.log')
+    compile_log = os.path.join(LOG_DIR, 'build_backend_compile.log')
+    
+    with c.cd(BACKEND_DIR):
+        print(f"  - Running CMake configure... (logging to _build/log/build_backend_configure.log)")
+        c.run(f"cmake -B build -S . > {cfg_log} 2>&1")
+        print(f"  - Compiling C++ binary...     (logging to _build/log/build_backend_compile.log)")
+        c.run(f"cmake --build build -j$(sysctl -n hw.ncpu) > {compile_log} 2>&1")
+    
+    # Check if build was successful and placed in _build/out
+    binary_path = os.path.join(OUT_DIR, 'osxmon_server')
+    if os.path.exists(binary_path):
+        print("  ✓ C++ Backend built successfully in '_build/out/osxmon_server'.")
+    else:
+        print(f"  ❌ Error: C++ compilation failed. Inspect build log: {compile_log}")
+        sys.exit(1)
+
+    # 2. Build Frontend Docker Container
+    frontend_log = os.path.join(LOG_DIR, 'build_frontend.log')
+    print(f"\n[2/2] Building frontend Next.js Docker image... (logging to _build/log/build_frontend.log)")
+    with c.cd(ROOT_DIR):
+        c.run(f"docker compose build > {frontend_log} 2>&1")
+    print("  ✓ Frontend Docker image built successfully.")
+    print("\n🎉 Build complete! Run 'inv start' to launch the dashboard.")
+
+@task
+def start(c):
+    """Start native C++ backend and containerized frontend"""
+    print("🚀 Starting osxmon services...")
+
+    # 1. Start C++ Backend Natively in Background
+    binary_path = os.path.join(OUT_DIR, 'osxmon_server')
+    if not os.path.exists(binary_path):
+        print("❌ Error: Backend binary not found. Please run 'inv build' first.")
+        sys.exit(1)
+
+    # Ensure log directory exists
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    # Check if already running
+    if os.path.exists(PID_FILE):
+        with open(PID_FILE, 'r') as f:
+            old_pid = f.read().strip()
+        if old_pid:
+            try:
+                os.kill(int(old_pid), 0)
+                print(f"⚠️  C++ Backend is already running natively (PID: {old_pid}).")
+            except (ProcessLookupError, ValueError):
+                os.remove(PID_FILE)
+
+    if not os.path.exists(PID_FILE):
+        print("  - Launching C++ Backend natively...")
+        with open(LOG_FILE, 'w') as log:
+            # Spawn in a separate process group to daemonize
+            p = subprocess.Popen(
+                [binary_path],
+                stdout=log,
+                stderr=log,
+                preexec_fn=os.setsid,
+                cwd=ROOT_DIR
+            )
+            # Write PID file
+            with open(PID_FILE, 'w') as f:
+                f.write(str(p.pid))
+            print(f"  ✓ C++ Backend started in background (PID: {p.pid}, logs: _build/log/backend.log).")
+
+    # 2. Start Frontend Docker Container
+    print("  - Launching Next.js frontend via Docker Compose...")
+    c.run("docker compose up -d")
+    print("  ✓ Frontend container started successfully.")
+
+    # 3. Print URLs
+    print("\n=======================================================")
+    print(" 🎉 osxmon services are active!")
+    print(" 🖥️  Frontend Dashboard: http://localhost:3000")
+    print(" 🛠️  Swagger UI docs:    http://localhost:8000/swagger/ui")
+    print(" 📁 Backend Logfile:    _build/log/backend.log")
+    print("=======================================================\n")
+
+@task
+def stop(c):
+    """Stop the native C++ backend and frontend Docker container"""
+    print("🛑 Stopping osxmon services...")
+
+    # 1. Stop Frontend container
+    print("  - Stopping Next.js Docker container...")
+    c.run("docker compose down")
+    print("  ✓ Frontend container stopped.")
+
+    # 2. Stop C++ Backend
+    if os.path.exists(PID_FILE):
+        print("  - Terminating native C++ Backend...")
+        with open(PID_FILE, 'r') as f:
+            pid_str = f.read().strip()
+        if pid_str:
+            try:
+                pid = int(pid_str)
+                # Terminate process group
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                print(f"  ✓ Process group (PID: {pid}) terminated.")
+            except (ProcessLookupError, ValueError):
+                print(f"  ⚠️  Process (PID: {pid_str}) was not found running.")
+            except Exception as e:
+                print(f"  ⚠️  Failed to terminate process cleanly: {e}")
+        os.remove(PID_FILE)
+    else:
+        print("  ✓ C++ Backend was not running.")
+
+    print("✓ All osxmon services stopped.")
+
+@task
+def status(c):
+    """Check the status of native and containerized services"""
+    print("🔍 Checking osxmon service status...\n")
+
+    backend_running = False
+    frontend_running = False
+
+    # Check backend
+    if os.path.exists(PID_FILE):
+        with open(PID_FILE, 'r') as f:
+            pid_str = f.read().strip()
+        if pid_str:
+            try:
+                pid = int(pid_str)
+                os.kill(pid, 0)
+                print(f"🟢 C++ Backend: RUNNING (PID: {pid}, host port 8000)")
+                backend_running = True
+            except (ProcessLookupError, ValueError):
+                print("🔴 C++ Backend: STOPPED (PID file exists but process is dead)")
+    else:
+        print("🔴 C++ Backend: STOPPED")
+
+    # Check frontend (via docker compose ps)
+    try:
+        res = subprocess.run(
+            ["docker", "compose", "ps", "--format", "json"],
+            capture_output=True,
+            text=True
+        )
+        if "osxmon-frontend" in res.stdout:
+            if '"State":"running"' in res.stdout or '"running"' in res.stdout:
+                print("🟢 Next.js Frontend: RUNNING (Docker, port 3000)")
+                frontend_running = True
+            else:
+                print("🟡 Next.js Frontend: CONTAINER EXISTS BUT NOT RUNNING")
+        else:
+            print("🔴 Next.js Frontend: STOPPED")
+    except Exception as e:
+        print(f"⚪ Next.js Frontend: UNABLE TO PROBE DOCKER ({e})")
+
+    if backend_running and frontend_running:
+        print("\n✨ All systems nominal! Visit http://localhost:3000")
+    else:
+        print("\n⚠️  Some services are offline. Run 'inv start' to boot them.")
+
+@task(name='test')
+def test(c):
+    """Run all compiled test suites in _build/test, piping output to _build/log"""
+    print("🧪 Running osxmon C++ test suites...")
+    os.makedirs(LOG_DIR, exist_ok=True)
+    
+    if not os.path.exists(TEST_DIR):
+        print("❌ Error: Test directory '_build/test' not found. Please run 'inv build' first.")
+        sys.exit(1)
+
+    test_binaries = ['oatppAllTests', 'module-tests']
+    failed = False
+    
+    for test_bin in test_binaries:
+        path = os.path.join(TEST_DIR, test_bin)
+        if os.path.exists(path):
+            log_path = os.path.join(LOG_DIR, f"test_{test_bin}.log")
+            print(f"\n🏃 Running test suite: {test_bin}... (piping logs to _build/log/test_{test_bin}.log)")
+            
+            # Redirect stdout & stderr to the log file
+            res = c.run(f"{path} > {log_path} 2>&1", warn=True)
+            if res.failed:
+                print(f"  ❌ Test suite {test_bin} failed! Check logs: {log_path}")
+                failed = True
+            else:
+                print(f"  ✓ Test suite {test_bin} passed successfully.")
+        else:
+            print(f"  ⚠️  Warning: Test suite {test_bin} not found at {path}")
+            
+    if failed:
+        print("\n❌ Some test suites failed!")
+        sys.exit(1)
+    else:
+        print("\n🎉 All test suites completed successfully!")
+
+@task(name='help')
+def help_task(c, task_name=None):
+    """List all tasks or show help for a specific task. Usage: inv help [--task-name <task>]"""
+    if task_name:
+        c.run(f"{sys.argv[0]} --help {task_name}")
+    else:
+        print("\n🛠️  osxmon Orchestration CLI Help")
+        print("================================")
+        print("To run a task, use: inv <task> [options]")
+        print("\nAvailable Tasks:")
+        c.run(f"{sys.argv[0]} --list")
+        print("\nFor help on a specific task, run:")
+        print("  inv help --task-name <task_name>")
+        print("  or use invoke's built-in flag: invoke --help <task_name>\n")

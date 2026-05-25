@@ -1,0 +1,257 @@
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+/* Header Styles */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+.titleArea h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.titleArea p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.statusIndicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-disk);
+  box-shadow: 0 0 6px var(--color-disk);
+}
+
+.online .statusDot {
+  background: var(--color-network);
+  box-shadow: 0 0 8px var(--color-network);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* Dashboard Grid Layout */
+.grid {
+  display: grid;
+  grid-template-columns: 8fr 4fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebarCol {
+  position: sticky;
+  top: 24px;
+}
+
+/* Row of Main Gauges */
+.gaugesRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .gaugesRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Metric Cards */
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.2);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.card:hover {
+  border-color: var(--border-color-hover);
+  background: var(--bg-card-hover);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+/* Disk details design */
+.diskList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diskItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diskInfo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.mountLabel {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.spaceLabel {
+  color: var(--text-secondary);
+}
+
+.progressBarTrack {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* Network Speeds List */
+.netList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.netItem {
+  display: grid;
+  grid-template-columns: 2fr 3fr 3fr;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.netName {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.netSpeed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.netSpeedUp {
+  color: #fb7185; /* soft rose */
+}
+
+.netSpeedDown {
+  color: var(--color-network);
+}
+
+/* Empty placeholder text */
+.emptyState {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 16px 0;
+}

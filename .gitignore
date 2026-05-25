@@ -1,0 +1,50 @@
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Python Virtual Environment & Caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Telemetry Process Logs & PIDs
+backend.pid
+backend.log
+
+# C++ Backend Build Artifacts
+backend/build/
+
+# Next.js Frontend Dependencies & Build Files
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+
+# Next.js environment files
+frontend/.env*.local
+
+# npm/Yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE Configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# _build directory
+_build/
+
