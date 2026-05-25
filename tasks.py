@@ -83,8 +83,11 @@ def build(c):
     print("  ✓ Frontend Docker image built successfully.")
     print("\n🎉 Build complete! Run 'inv start' to launch the dashboard.")
 
-@task
-def start(c):
+@task(help={
+    'verbose': "Enable verbose logging for the C++ backend",
+    'log_level': "Set log level for the C++ backend (verbose, debug, info, warning, error)"
+})
+def start(c, verbose=False, log_level='info'):
     """Start native C++ backend and containerized frontend"""
     print("🚀 Starting osxmon services...")
 
@@ -110,10 +113,18 @@ def start(c):
 
     if not os.path.exists(PID_FILE):
         print("  - Launching C++ Backend natively...")
+        
+        # Build executable arguments
+        args = [binary_path]
+        if verbose:
+            args.append("-v")
+        elif log_level:
+            args.extend(["--log-level", log_level])
+
         with open(LOG_FILE, 'w') as log:
             # Spawn in a separate process group to daemonize
             p = subprocess.Popen(
-                [binary_path],
+                args,
                 stdout=log,
                 stderr=log,
                 preexec_fn=os.setsid,

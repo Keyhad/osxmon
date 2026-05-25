@@ -5,9 +5,20 @@
 #include "oatpp-swagger/Resources.hpp"
 #include "oatpp/web/server/HttpConnectionHandler.hpp"
 #include "oatpp/web/server/interceptor/AllowCorsGlobal.hpp"
+#include "oatpp/web/server/interceptor/RequestInterceptor.hpp"
 #include "oatpp/network/tcp/server/ConnectionProvider.hpp"
 #include "oatpp/parser/json/mapping/ObjectMapper.hpp"
 #include "oatpp/core/macro/component.hpp"
+
+class RequestLoggingInterceptor : public oatpp::web::server::interceptor::RequestInterceptor {
+public:
+  std::shared_ptr<OutgoingResponse> intercept(const std::shared_ptr<IncomingRequest>& request) override {
+    OATPP_LOGI("Request", "%s %s", 
+               request->getStartingLine().method.toString()->c_str(), 
+               request->getStartingLine().path.toString()->c_str());
+    return nullptr;
+  }
+};
 
 class AppComponent {
 public:
@@ -28,6 +39,7 @@ public:
     auto connectionHandler = oatpp::web::server::HttpConnectionHandler::createShared(router);
     
     // Wire up global CORS preflight and headers
+    connectionHandler->addRequestInterceptor(std::make_shared<RequestLoggingInterceptor>());
     connectionHandler->addRequestInterceptor(std::make_shared<oatpp::web::server::interceptor::AllowOptionsGlobal>());
     connectionHandler->addResponseInterceptor(std::make_shared<oatpp::web::server::interceptor::AllowCorsGlobal>());
     
