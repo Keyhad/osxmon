@@ -39,6 +39,14 @@ Compile the C++ backend natively and build the Next.js Docker image:
 *   **C++ Unit Tests** compile to: `_build/test/`
 *   **Build Logs** are saved to: `_build/log/`
 
+### 3. Rebuild (Auto-Stop & Rebuild)
+To rebuild backend/frontend when services are already running (this task stops them first before performing the build):
+```bash
+./.venv/bin/invoke rebuild            # Rebuilds both backend and frontend
+./.venv/bin/invoke rebuild --backend  # Or -b: Rebuilds C++ backend only
+./.venv/bin/invoke rebuild --frontend # Or -f: Rebuilds frontend image only
+```
+
 ---
 
 ## 💻 Develop
