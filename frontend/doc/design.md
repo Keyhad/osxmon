@@ -81,5 +81,5 @@ The frontend uses **Docker** to containerize Next.js in a production-ready envir
 * **Dockerfile**: Employs a multi-stage compilation pipeline:
   * **Stage 1 (Builder)**: Installs npm packages and executes `npm run build` using Next.js standalone outputs.
   * **Stage 2 (Runner)**: Copies compiled standalone build items into a minimal node-alpine container.
-* **Docker Compose Mapping**: Maps host port `3000` to container port `3000`. It configures `extra_hosts` to route requests to the native C++ API using `host.docker.internal:host-gateway`.
+* **Docker Compose Mapping**: Maps host port `3300` to container port `3300`. It configures `extra_hosts` to route requests to the native C++ API using `host.docker.internal:host-gateway`.
 * **Zero-Warning Config**: Configured using standard V2 syntax without deprecated properties to ensure warning-free compilation.

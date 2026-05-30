@@ -11,7 +11,7 @@ The application utilizes a **native C++ backend** powered by the **Oat++ framewo
 To accurately monitor host performance while keeping a modern containerized workflow, `osxmon` uses a hybrid architecture:
 
 *   **Backend (C++ / Oat++)**: Runs natively on the host Mac. Spawning Docker containers on macOS forces execution inside a Linux virtual machine, rendering host system metrics (like macOS process PIDs or Mach memory states) inaccessible. Running the C++ code natively allows direct host telemetry access.
-*   **Frontend (Next.js)**: Runs in a lightweight, containerized Alpine environment mapped to port `3000`. It communicates with the host API via `host.docker.internal`.
+*   **Frontend (Next.js)**: Runs in a lightweight, containerized Alpine environment mapped to port `3300`. It communicates with the host API via `host.docker.internal`.
 *   **Orchestration**: Managed via Python `invoke` task runner and `docker-compose`.
 
 ---
@@ -103,6 +103,8 @@ You can customize the backend logging level by passing options:
 ./.venv/bin/invoke start --verbose           # Or -v: Enable verbose/debug logs
 ./.venv/bin/invoke start --log-level debug   # Or -l debug: Select log level (verbose, debug, info, warning, error)
 ./.venv/bin/invoke start --config osxmon.config.yml  # Load startup YAML config (process list + defaults)
+./.venv/bin/invoke start --port 3100         # Bind frontend dashboard to a different host port
+./.venv/bin/invoke start --host 203.0.113.10 # Public IP or DNS name for dashboard/API access hints
 ```
 See all start options with:
 ```bash
@@ -126,7 +128,7 @@ monitoredProcesses:
 ```
 Use the root-level [osxmon.config.yml](osxmon.config.yml) as the template.
 
-*   **Frontend URL**: [http://localhost:3000](http://localhost:3000)
+*   **Frontend URL**: [http://localhost:3300](http://localhost:3300) by default (or your custom `--host` and `--port` values)
 *   **Swagger API UI Docs**: [http://localhost:8000/swagger/ui](http://localhost:8000/swagger/ui)
 *   **OpenAPI JSON Specification**: [http://localhost:8000/api-docs/oas-3.0.0.json](http://localhost:8000/api-docs/oas-3.0.0.json)
 *   **Log Output**: Server daemon outputs are saved directly to `_build/log/backend.log` and PID to `_build/log/backend.pid`. When request logging is enabled (e.g., at `info`, `debug`, or `verbose` levels), incoming requests are logged.

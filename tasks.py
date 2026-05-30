@@ -25,6 +25,55 @@ LOG_DIR = os.path.join(BUILD_DIR, 'log')
 PID_FILE = os.path.join(LOG_DIR, 'backend.pid')
 LOG_FILE = os.path.join(LOG_DIR, 'backend.log')
 
+
+def _normalize_port(port):
+    """Validate and normalize a user-supplied TCP port value."""
+    try:
+        normalized = int(port)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid port '{port}'. Port must be an integer between 1 and 65535.")
+
+    if normalized < 1 or normalized > 65535:
+        raise ValueError(f"Invalid port '{port}'. Port must be between 1 and 65535.")
+
+    return normalized
+
+
+def _normalize_host(host):
+    """Validate and normalize a user-supplied hostname or IP address."""
+    if host is None:
+        return 'localhost'
+
+    normalized = str(host).strip()
+    if not normalized:
+        raise ValueError("Invalid host ''. Host must be a non-empty domain, IPv4, IPv6, or 'localhost'.")
+
+    # Accept values passed as URLs and normalize to host only.
+    normalized = re.sub(r'^https?://', '', normalized)
+    normalized = normalized.rstrip('/')
+
+    if not normalized:
+        raise ValueError("Invalid host. Host must be a non-empty domain, IPv4, IPv6, or 'localhost'.")
+
+    return normalized
+
+
+def _detect_frontend_host_port(default=3300):
+    """Return mapped host port for frontend container port 3300, if available."""
+    try:
+        res = subprocess.run(
+            ["docker", "compose", "port", "osxmon-frontend", "3300"],
+            capture_output=True,
+            text=True
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            # Typical output: 0.0.0.0:3300 or [::]:3300
+            return int(res.stdout.strip().rsplit(':', 1)[-1])
+    except (ValueError, OSError):
+        pass
+
+    return default
+
 @task(help={
     'backend': "Clean only backend build files and outputs",
     'frontend': "Clean only frontend build caches and node_modules",
@@ -155,10 +204,24 @@ def rebuild(c, backend=False, frontend=False):
         "[default: info]. Use 'verbose' to see all request/SMC/startup output in backend.log."
     ),
     'config': "Optional path to a YAML startup config file (for process watch-list and telemetry defaults).",
+    'port': "Host port for the frontend dashboard container [default: 3300].",
+    'host': "Public host/IP for dashboard URL display and frontend API target [default: localhost].",
 })
-def start(c, verbose=False, log_level='info', config=None):
+def start(c, verbose=False, log_level='info', config=None, port=3300, host='localhost'):
     """Start native C++ backend and containerized frontend"""
     print("🚀 Starting osxmon services...")
+
+    try:
+        frontend_port = _normalize_port(port)
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
+    try:
+        frontend_host = _normalize_host(host)
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
 
     # 1. Start C++ Backend Natively in Background
     binary_path = os.path.join(OUT_DIR, 'osxmon_server')
@@ -207,14 +270,14 @@ def start(c, verbose=False, log_level='info', config=None):
             print(f"  ✓ C++ Backend started in background (PID: {p.pid}, logs: _build/log/backend.log).")
 
     # 2. Start Frontend Docker Container
-    print("  - Launching Next.js frontend via Docker Compose...")
-    run_no_stdin(c, "docker compose up -d")
+    print(f"  - Launching Next.js frontend via Docker Compose (host: {frontend_host}, port: {frontend_port})...")
+    run_no_stdin(c, f"FRONTEND_HOST={frontend_host} FRONTEND_PORT={frontend_port} docker compose up -d")
     print("  ✓ Frontend container started successfully.")
 
     # 3. Print URLs
     print("\n=======================================================")
     print(" 🎉 osxmon services are active!")
-    print(" 🖥️  Frontend Dashboard: http://localhost:3000")
+    print(f" 🖥️  Frontend Dashboard: http://{frontend_host}:{frontend_port}")
     print(" 🛠️  Swagger UI docs:    http://localhost:8000/swagger/ui")
     print(f" 📁 Backend Logfile:    _build/log/backend.log  (level: {effective_level})")
     print("=======================================================\n")
@@ -274,6 +337,7 @@ def status(c):
         print("🔴 C++ Backend: STOPPED")
 
     # Check frontend (via docker compose ps)
+    frontend_port = _detect_frontend_host_port(default=3300)
     try:
         res = subprocess.run(
             ["docker", "compose", "ps", "--format", "json"],
@@ -282,7 +346,7 @@ def status(c):
         )
         if "osxmon-frontend" in res.stdout:
             if '"State":"running"' in res.stdout or '"running"' in res.stdout:
-                print("🟢 Next.js Frontend: RUNNING (Docker, port 3000)")
+                print(f"🟢 Next.js Frontend: RUNNING (Docker, port {frontend_port})")
                 frontend_running = True
             else:
                 print("🟡 Next.js Frontend: CONTAINER EXISTS BUT NOT RUNNING")
@@ -292,7 +356,7 @@ def status(c):
         print(f"⚪ Next.js Frontend: UNABLE TO PROBE DOCKER ({e})")
 
     if backend_running and frontend_running:
-        print("\n✨ All systems nominal! Visit http://localhost:3000")
+        print(f"\n✨ All systems nominal! Visit http://localhost:{frontend_port}")
     else:
         print("\n⚠️  Some services are offline. Run 'inv start' to boot them.")
 

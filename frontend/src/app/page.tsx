@@ -9,7 +9,7 @@ import { ProcessTable } from '@/components/ProcessTable';
 import { ConfigPanel, Config } from '@/components/ConfigPanel';
 import styles from './page.module.css';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '';
 
 interface CpuCore {
   id: number;
@@ -191,7 +191,7 @@ export default function Dashboard() {
         console.log('Attempting to reconnect to C++ backend...');
         fetchConfig();
       }
-    }, 3000);
+    }, 3300);
 
     return () => {
       if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
