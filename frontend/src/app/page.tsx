@@ -11,10 +11,20 @@ import styles from './page.module.css';
 
 const API_BASE = 'http://localhost:8000';
 
+interface CpuCore {
+  id: number;
+  user: number;
+  system: number;
+  idle: number;
+  load: number;
+}
+
 interface CpuMetrics {
   user: number;
   system: number;
   idle: number;
+  temperature?: number;
+  cores?: CpuCore[];
 }
 
 interface MemoryMetrics {
@@ -105,7 +115,7 @@ export default function Dashboard() {
         setIsConnected(true);
       }
     } catch (err) {
-      console.warn('Failed to fetch initial configuration. Server might be offline.');
+      console.warn('Failed to fetch initial configuration. Server might be offline.', err);
       setIsConnected(false);
     }
   };
@@ -150,7 +160,7 @@ export default function Dashboard() {
         }
       }
     } catch (err) {
-      console.warn('Metrics collection poll failed. Server disconnected.');
+      console.warn('Metrics collection poll failed. Server disconnected.', err);
       setIsConnected(false);
     }
   }, [isPaused]);
@@ -162,6 +172,7 @@ export default function Dashboard() {
     if (isConnected && !isPaused) {
       pollingTimerRef.current = setInterval(fetchMetrics, config.pollingIntervalMs);
       // Run immediate poll
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchMetrics();
     }
 
@@ -172,6 +183,7 @@ export default function Dashboard() {
 
   // Initial load and connection retry loop
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchConfig();
 
     reconnectTimerRef.current = setInterval(() => {
@@ -216,7 +228,7 @@ export default function Dashboard() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
           </svg>
-          Unable to establish connection to C++ server on port 8000. Start the backend by running `./osxmon_server` in `backend/build`.
+          Unable to establish connection to C++ server on port 8000. Start the backend by running <code>./osxmon_server</code> in <code>backend/build</code>.
         </div>
       )}
 
@@ -229,190 +241,231 @@ export default function Dashboard() {
           {/* Gauges Row */}
           <div className={styles.gaugesRow}>
             {/* CPU Card */}
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-cpu)' }}>
-                    <rect x="4" y="4" width="16" height="16" rx="2" />
-                    <path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
-                  </svg>
-                  CPU Load
-                </span>
-              </div>
-              {config.enableCpu && metrics?.cpu ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <Gauge
-                    value={metrics.cpu.user + metrics.cpu.system}
-                    title="CPU"
-                    subtitle={`${metrics.cpu.user.toFixed(1)}% user, ${metrics.cpu.system.toFixed(1)}% sys`}
-                    colorStart="#00e5ff"
-                    colorEnd="#0080ff"
-                    glowColor="rgba(0, 240, 255, 0.3)"
-                    icon={
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            {config.enableCpu && (
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-cpu)' }}>
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                      <path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
+                    </svg>
+                    CPU Load
+                  </span>
+                  {metrics?.cpu?.temperature !== undefined && metrics.cpu.temperature > 0 && (
+                    <span className={styles.cpuTempBadge}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
                       </svg>
-                    }
-                  />
-                  <div style={{ marginTop: 8 }}>
-                    <HistoryChart
-                      history={cpuHistory}
-                      color="var(--color-cpu)"
-                      glowColor="var(--color-cpu-glow)"
-                      title="cpu"
+                      {metrics.cpu.temperature.toFixed(1)}°C
+                    </span>
+                  )}
+                </div>
+                {metrics?.cpu ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <Gauge
+                      value={metrics.cpu.user + metrics.cpu.system}
+                      title="CPU"
+                      subtitle={`${metrics.cpu.user.toFixed(1)}% user, ${metrics.cpu.system.toFixed(1)}% sys`}
+                      colorStart="#00e5ff"
+                      colorEnd="#0080ff"
+                      glowColor="rgba(0, 240, 255, 0.3)"
+                      icon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                      }
                     />
+                    <div style={{ marginTop: 8 }}>
+                      <HistoryChart
+                        history={cpuHistory}
+                        color="var(--color-cpu)"
+                        glowColor="var(--color-cpu-glow)"
+                        title="cpu"
+                      />
+                    </div>
+                    {/* Per-core load bars */}
+                    {metrics.cpu.cores && metrics.cpu.cores.length > 0 && (
+                      <div className={styles.coresSection}>
+                        <div className={styles.coresSectionLabel}>Core Load</div>
+                        <div className={styles.coresGrid}>
+                          {metrics.cpu.cores.map((core) => (
+                            <div key={core.id} className={styles.coreBarWrapper} title={`Core ${core.id}: ${core.load.toFixed(1)}%`}>
+                              <div className={styles.coreBarTrack}>
+                                <div
+                                  className={styles.coreBarFill}
+                                  style={{
+                                    height: `${Math.max(core.load, 2)}%`,
+                                    background: `linear-gradient(to top, #0080ff, #00e5ff)`,
+                                    boxShadow: core.load > 50 ? '0 0 6px rgba(0,229,255,0.4)' : 'none',
+                                  }}
+                                />
+                              </div>
+                              <span className={styles.coreBarLabel}>C{core.id}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  {config.enableCpu ? 'Awaiting telemetry response...' : 'CPU collector is disabled.'}
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    Awaiting telemetry response...
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Memory Card */}
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-memory)' }}>
-                    <path d="M6 19h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2zM10 5v4M14 5v4M10 15v4M14 15v4" />
-                  </svg>
-                  Physical Memory
-                </span>
-              </div>
-              {config.enableMemory && metrics?.memory ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <Gauge
-                    value={(metrics.memory.used / metrics.memory.total) * 100}
-                    title="RAM"
-                    subtitle={`${formatDiskSize(metrics.memory.used)} of ${formatDiskSize(metrics.memory.total)}`}
-                    colorStart="#d946ef"
-                    colorEnd="#8b5cf6"
-                    glowColor="rgba(189, 92, 255, 0.3)"
-                    icon={
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                      </svg>
-                    }
-                  />
-                  <div style={{ marginTop: 8 }}>
-                    <HistoryChart
-                      history={memoryHistory}
-                      color="var(--color-memory)"
-                      glowColor="var(--color-memory-glow)"
-                      title="memory"
+            {config.enableMemory && (
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-memory)' }}>
+                      <path d="M6 19h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2zM10 5v4M14 5v4M10 15v4M14 15v4" />
+                    </svg>
+                    Physical Memory
+                  </span>
+                </div>
+                {metrics?.memory ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <Gauge
+                      value={(metrics.memory.used / metrics.memory.total) * 100}
+                      title="RAM"
+                      subtitle={`${formatDiskSize(metrics.memory.used)} of ${formatDiskSize(metrics.memory.total)}`}
+                      colorStart="#d946ef"
+                      colorEnd="#8b5cf6"
+                      glowColor="rgba(189, 92, 255, 0.3)"
+                      icon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                        </svg>
+                      }
                     />
+                    <div style={{ marginTop: 8 }}>
+                      <HistoryChart
+                        history={memoryHistory}
+                        color="var(--color-memory)"
+                        glowColor="var(--color-memory-glow)"
+                        title="memory"
+                      />
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  {config.enableMemory ? 'Awaiting telemetry response...' : 'Memory collector is disabled.'}
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    Awaiting telemetry response...
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Disks & Network Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
             
             {/* Storage Card */}
-            <div className={styles.card} style={{ gridColumn: 'span 1' }}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-disk)' }}>
-                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-                    <line x1="6" y1="6" x2="6.01" y2="6" />
-                    <line x1="6" y1="18" x2="6.01" y2="18" />
-                  </svg>
-                  Disk Storage
-                </span>
+            {config.enableDisk && (
+              <div className={styles.card} style={{ gridColumn: 'span 1' }}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-disk)' }}>
+                      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                      <line x1="6" y1="6" x2="6.01" y2="6" />
+                      <line x1="6" y1="18" x2="6.01" y2="18" />
+                    </svg>
+                    Disk Storage
+                  </span>
+                </div>
+                {metrics?.disks && metrics.disks.length > 0 ? (
+                  <div className={styles.diskList}>
+                    {metrics.disks.map((disk) => (
+                      <div key={disk.mountPoint} className={styles.diskItem}>
+                        <div className={styles.diskInfo}>
+                          <span className={styles.mountLabel}>{disk.mountPoint}</span>
+                          <span className={styles.spaceLabel}>
+                            {formatDiskSize(disk.used)} / {formatDiskSize(disk.total)} ({disk.usedPercent.toFixed(0)}%)
+                          </span>
+                        </div>
+                        <div className={styles.progressBarTrack}>
+                          <div 
+                            className={styles.progressBarFill} 
+                            style={{ 
+                              width: `${disk.usedPercent}%`, 
+                              backgroundColor: 'var(--color-disk)',
+                              boxShadow: '0 0 8px var(--color-disk-glow)'
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    Awaiting telemetry response...
+                  </div>
+                )}
               </div>
-              {config.enableDisk && metrics?.disks && metrics.disks.length > 0 ? (
-                <div className={styles.diskList}>
-                  {metrics.disks.map((disk) => (
-                    <div key={disk.mountPoint} className={styles.diskItem}>
-                      <div className={styles.diskInfo}>
-                        <span className={styles.mountLabel}>{disk.mountPoint}</span>
-                        <span className={styles.spaceLabel}>
-                          {formatDiskSize(disk.used)} / {formatDiskSize(disk.total)} ({disk.usedPercent.toFixed(0)}%)
-                        </span>
-                      </div>
-                      <div className={styles.progressBarTrack}>
-                        <div 
-                          className={styles.progressBarFill} 
-                          style={{ 
-                            width: `${disk.usedPercent}%`, 
-                            backgroundColor: 'var(--color-disk)',
-                            boxShadow: '0 0 8px var(--color-disk-glow)'
-                          }} 
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  {config.enableDisk ? 'Awaiting telemetry response...' : 'Disk collector is disabled.'}
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Network Card */}
-            <div className={styles.card} style={{ gridColumn: 'span 1' }}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-network)' }}>
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                  Network interfaces
-                </span>
+            {config.enableNetwork && (
+              <div className={styles.card} style={{ gridColumn: 'span 1' }}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--color-network)' }}>
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    Network interfaces
+                  </span>
+                </div>
+                {metrics?.network && metrics.network.length > 0 ? (
+                  <div className={styles.netList}>
+                    {metrics.network.map((net) => (
+                      <div key={net.interface} className={styles.netItem}>
+                        <span className={styles.netName}>{net.interface}</span>
+                        
+                        {/* Download */}
+                        <span className={`${styles.netSpeed} ${styles.netSpeedDown}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <polyline points="19 12 12 19 5 12" />
+                          </svg>
+                          {formatSpeed(net.inputSpeed)}
+                        </span>
+  
+                        {/* Upload */}
+                        <span className={`${styles.netSpeed} ${styles.netSpeedUp}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="12" y1="19" x2="12" y2="5" />
+                            <polyline points="5 12 12 5 19 12" />
+                          </svg>
+                          {formatSpeed(net.outputSpeed)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    Awaiting telemetry response...
+                  </div>
+                )}
               </div>
-              {config.enableNetwork && metrics?.network && metrics.network.length > 0 ? (
-                <div className={styles.netList}>
-                  {metrics.network.map((net) => (
-                    <div key={net.interface} className={styles.netItem}>
-                      <span className={styles.netName}>{net.interface}</span>
-                      
-                      {/* Download */}
-                      <span className={`${styles.netSpeed} ${styles.netSpeedDown}`}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <line x1="12" y1="5" x2="12" y2="19" />
-                          <polyline points="19 12 12 19 5 12" />
-                        </svg>
-                        {formatSpeed(net.inputSpeed)}
-                      </span>
-
-                      {/* Upload */}
-                      <span className={`${styles.netSpeed} ${styles.netSpeedUp}`}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <line x1="12" y1="19" x2="12" y2="5" />
-                          <polyline points="5 12 12 5 19 12" />
-                        </svg>
-                        {formatSpeed(net.outputSpeed)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  {config.enableNetwork ? 'Awaiting telemetry response...' : 'Network collector is disabled.'}
-                </div>
-              )}
-            </div>
+            )}
 
           </div>
 
           {/* Processes Card */}
-          <div className={styles.card}>
-            {config.enableProcesses && metrics?.processes ? (
-              <ProcessTable processes={metrics.processes} />
-            ) : (
-              <div className={styles.emptyState}>
-                {config.enableProcesses ? 'Awaiting telemetry response...' : 'Process collector is disabled.'}
-              </div>
-            )}
-          </div>
+          {config.enableProcesses && (
+            <div className={styles.card}>
+              {metrics?.processes ? (
+                <ProcessTable processes={metrics.processes} />
+              ) : (
+                <div className={styles.emptyState}>
+                  Awaiting telemetry response...
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
 

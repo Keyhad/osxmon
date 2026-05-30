@@ -39,7 +39,7 @@ export const ProcessTable: React.FC<ProcessTableProps> = ({ processes = [] }) =>
 
   const filteredAndSortedProcesses = useMemo(() => {
     // 1. Filter
-    let result = processes.filter(
+    const result = processes.filter(
       (p) =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.pid.toString().includes(searchTerm)
@@ -47,8 +47,8 @@ export const ProcessTable: React.FC<ProcessTableProps> = ({ processes = [] }) =>
 
     // 2. Sort
     result.sort((a, b) => {
-      let valA = a[sortKey];
-      let valB = b[sortKey];
+      const valA = a[sortKey];
+      const valB = b[sortKey];
 
       if (typeof valA === 'string' && typeof valB === 'string') {
         return sortOrder === 'asc' 

@@ -21,17 +21,27 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <unistd.h>
+#include <mach/processor_info.h>
 
 #include "dto/MonitorDto.hpp"
 #include "oatpp/core/Types.hpp"
+#include "service/SMCService.hpp"
 
 class MonitorService {
 private:
     std::mutex m_mutex;
-    
-    // CPU Ticks cache
+
+    // SMC for CPU temperature
+    SMCService m_smc;
+
+    // Aggregate CPU ticks cache
     host_cpu_load_info_data_t m_prevCpuLoad;
     bool m_hasPrevCpu = false;
+
+    // Per-core ticks cache (allocated by host_processor_info, freed with vm_deallocate)
+    processor_info_array_t m_prevCoreInfo      = nullptr;
+    natural_t              m_prevCoreCount     = 0;
+    mach_msg_type_number_t m_prevCoreInfoCount = 0;
 
     // Network stats cache
     struct NetCounter {
@@ -59,11 +69,19 @@ private:
 public:
     MonitorService() {
         m_cpuCores = getCpuCores();
-        // Zero initialize CPU stats
-        m_prevCpuLoad.cpu_ticks[CPU_STATE_USER] = 0;
+        // Zero initialize aggregate CPU stats
+        m_prevCpuLoad.cpu_ticks[CPU_STATE_USER]   = 0;
         m_prevCpuLoad.cpu_ticks[CPU_STATE_SYSTEM] = 0;
-        m_prevCpuLoad.cpu_ticks[CPU_STATE_IDLE] = 0;
-        m_prevCpuLoad.cpu_ticks[CPU_STATE_NICE] = 0;
+        m_prevCpuLoad.cpu_ticks[CPU_STATE_IDLE]   = 0;
+        m_prevCpuLoad.cpu_ticks[CPU_STATE_NICE]   = 0;
+    }
+
+    ~MonitorService() {
+        if (m_prevCoreInfo) {
+            vm_deallocate(mach_task_self(),
+                          (vm_address_t)m_prevCoreInfo,
+                          sizeof(processor_cpu_load_info_data_t) * m_prevCoreCount);
+        }
     }
 
     oatpp::Object<MetricsResponseDto> getMetrics(const oatpp::Object<ConfigDto>& config) {
@@ -105,6 +123,69 @@ public:
                     m_hasPrevCpu = true;
                 }
                 m_prevCpuLoad = currCpuLoad;
+            }
+        }
+
+        // 1b. CPU Temperature via SMC
+        if (config->enableCpu && response->cpu) {
+            double temp = m_smc.getCpuTemperature();
+            response->cpu->temperature = temp;
+        }
+
+        // 1c. Per-core CPU load
+        if (config->enableCpu) {
+            processor_info_array_t currCoreInfo      = nullptr;
+            natural_t              currCoreCount     = 0;
+            mach_msg_type_number_t currCoreInfoCount = 0;
+
+            if (host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO,
+                                    &currCoreCount, &currCoreInfo, &currCoreInfoCount) == KERN_SUCCESS) {
+
+                auto coreList = oatpp::List<oatpp::Object<CpuCoreDto>>::createShared();
+
+                if (m_prevCoreInfo != nullptr && m_prevCoreCount == currCoreCount) {
+                    auto* curr = (processor_cpu_load_info_t)currCoreInfo;
+                    auto* prev = (processor_cpu_load_info_t)m_prevCoreInfo;
+
+                    for (natural_t i = 0; i < currCoreCount; i++) {
+                        uint64_t user   = curr[i].cpu_ticks[CPU_STATE_USER]   - prev[i].cpu_ticks[CPU_STATE_USER];
+                        uint64_t sys    = curr[i].cpu_ticks[CPU_STATE_SYSTEM] - prev[i].cpu_ticks[CPU_STATE_SYSTEM];
+                        uint64_t idle   = curr[i].cpu_ticks[CPU_STATE_IDLE]   - prev[i].cpu_ticks[CPU_STATE_IDLE];
+                        uint64_t nice   = curr[i].cpu_ticks[CPU_STATE_NICE]   - prev[i].cpu_ticks[CPU_STATE_NICE];
+                        uint64_t total  = user + sys + idle + nice;
+
+                        auto core = CpuCoreDto::createShared();
+                        core->id  = (int32_t)i;
+                        if (total > 0) {
+                            core->user   = (double)user  / total * 100.0;
+                            core->system = (double)sys   / total * 100.0;
+                            core->idle   = (double)idle  / total * 100.0;
+                            core->load   = core->user + core->system;
+                        } else {
+                            core->user = core->system = core->load = 0.0;
+                            core->idle = 100.0;
+                        }
+                        coreList->push_back(core);
+                    }
+                }
+
+                // Free old buffer, retain new one
+                if (m_prevCoreInfo) {
+                    vm_deallocate(mach_task_self(),
+                                  (vm_address_t)m_prevCoreInfo,
+                                  sizeof(processor_cpu_load_info_data_t) * m_prevCoreCount);
+                }
+                m_prevCoreInfo      = currCoreInfo;
+                m_prevCoreCount     = currCoreCount;
+                m_prevCoreInfoCount = currCoreInfoCount;
+
+                // Attach cores to response (even if empty on first poll)
+                if (!response->cpu) {
+                    auto cpuDto = CpuMetricsDto::createShared();
+                    cpuDto->user = 0.0; cpuDto->system = 0.0; cpuDto->idle = 100.0;
+                    response->cpu = cpuDto;
+                }
+                response->cpu->cores = coreList;
             }
         }
 

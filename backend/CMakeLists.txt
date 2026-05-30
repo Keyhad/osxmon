@@ -54,6 +54,8 @@ target_include_directories(osxmon_server PRIVATE src)
 target_link_libraries(osxmon_server PRIVATE
     oatpp::oatpp
     oatpp-swagger
+    "-framework IOKit"
+    "-framework CoreFoundation"
 )
 
 # Define Swagger Resources path pointing to the fetched source directory

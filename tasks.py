@@ -143,8 +143,11 @@ def rebuild(c, backend=False, frontend=False):
     build(c, backend=backend, frontend=frontend)
 
 @task(help={
-    'verbose': "Enable verbose logging for the C++ backend",
-    'log_level': "Set log level for the C++ backend (verbose, debug, info, warning, error)"
+    'verbose': "Enable verbose logging for the C++ backend (shorthand for --log-level verbose)",
+    'log_level': (
+        "Log level for the C++ backend: verbose, debug, info, warning, error  "
+        "[default: info]. Use 'verbose' to see all request/SMC/startup output in backend.log."
+    ),
 })
 def start(c, verbose=False, log_level='info'):
     """Start native C++ backend and containerized frontend"""
@@ -159,6 +162,9 @@ def start(c, verbose=False, log_level='info'):
     # Ensure log directory exists
     os.makedirs(LOG_DIR, exist_ok=True)
 
+    # Resolve effective log level
+    effective_level = 'verbose' if verbose else log_level
+
     # Check if already running
     if os.path.exists(PID_FILE):
         with open(PID_FILE, 'r') as f:
@@ -171,14 +177,10 @@ def start(c, verbose=False, log_level='info'):
                 os.remove(PID_FILE)
 
     if not os.path.exists(PID_FILE):
-        print("  - Launching C++ Backend natively...")
-        
+        print(f"  - Launching C++ Backend natively (log-level: {effective_level})...")
+
         # Build executable arguments
-        args = [binary_path]
-        if verbose:
-            args.append("-v")
-        elif log_level:
-            args.extend(["--log-level", log_level])
+        args = [binary_path, '--log-level', effective_level]
 
         with open(LOG_FILE, 'w') as log:
             # Spawn in a separate process group to daemonize
@@ -204,7 +206,7 @@ def start(c, verbose=False, log_level='info'):
     print(" 🎉 osxmon services are active!")
     print(" 🖥️  Frontend Dashboard: http://localhost:3000")
     print(" 🛠️  Swagger UI docs:    http://localhost:8000/swagger/ui")
-    print(" 📁 Backend Logfile:    _build/log/backend.log")
+    print(f" 📁 Backend Logfile:    _build/log/backend.log  (level: {effective_level})")
     print("=======================================================\n")
 
 @task

@@ -6,11 +6,22 @@
 
 #include OATPP_CODEGEN_BEGIN(DTO)
 
+class CpuCoreDto : public oatpp::DTO {
+  DTO_INIT(CpuCoreDto, DTO)
+  DTO_FIELD(Int32,   id);
+  DTO_FIELD(Float64, user);
+  DTO_FIELD(Float64, system);
+  DTO_FIELD(Float64, idle);
+  DTO_FIELD(Float64, load); // user + system
+};
+
 class CpuMetricsDto : public oatpp::DTO {
   DTO_INIT(CpuMetricsDto, DTO)
   DTO_FIELD(Float64, system);
   DTO_FIELD(Float64, user);
   DTO_FIELD(Float64, idle);
+  DTO_FIELD(Float64, temperature);             // Celsius, -1 if unavailable
+  DTO_FIELD(List<Object<CpuCoreDto>>, cores);  // per-logical-core loads
 };
 
 class MemoryMetricsDto : public oatpp::DTO {
