@@ -2,6 +2,7 @@ import React from 'react';
 import styles from './ConfigPanel.module.css';
 
 export interface Config {
+  title?: string;
   pollingIntervalMs: number;
   enableCpu: boolean;
   enableMemory: boolean;
@@ -9,6 +10,7 @@ export interface Config {
   enableNetwork: boolean;
   enableProcesses: boolean;
   maxProcesses: number;
+  monitoredProcesses?: string[];
 }
 
 interface ConfigPanelProps {

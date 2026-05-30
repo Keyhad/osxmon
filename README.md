@@ -102,7 +102,30 @@ You can customize the backend logging level by passing options:
 ```bash
 ./.venv/bin/invoke start --verbose           # Or -v: Enable verbose/debug logs
 ./.venv/bin/invoke start --log-level debug   # Or -l debug: Select log level (verbose, debug, info, warning, error)
+./.venv/bin/invoke start --config osxmon.config.yml  # Load startup YAML config (process list + defaults)
 ```
+See all start options with:
+```bash
+./.venv/bin/invoke help --task-name start
+```
+
+Startup YAML fields:
+```yaml
+config:
+  pollingIntervalMs: 1000
+  enableCpu: true
+  enableMemory: true
+  enableDisk: true
+  enableNetwork: true
+  enableProcesses: true
+  maxProcesses: 15
+
+monitoredProcesses:
+  - WindowServer
+  - Google Chrome
+```
+Use the root-level [osxmon.config.yml](osxmon.config.yml) as the template.
+
 *   **Frontend URL**: [http://localhost:3000](http://localhost:3000)
 *   **Swagger API UI Docs**: [http://localhost:8000/swagger/ui](http://localhost:8000/swagger/ui)
 *   **OpenAPI JSON Specification**: [http://localhost:8000/api-docs/oas-3.0.0.json](http://localhost:8000/api-docs/oas-3.0.0.json)

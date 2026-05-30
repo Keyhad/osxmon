@@ -17,27 +17,57 @@ private:
     oatpp::Object<ConfigDto> m_config;
     std::mutex m_configMutex;
 
+    static oatpp::Object<ConfigDto> createDefaultConfig() {
+        auto config = ConfigDto::createShared();
+        config->title = "osxmon dashboard";
+        config->pollingIntervalMs = 1000;
+        config->enableCpu = true;
+        config->enableMemory = true;
+        config->enableDisk = true;
+        config->enableNetwork = true;
+        config->enableProcesses = true;
+        config->maxProcesses = 10;
+        config->monitoredProcesses = oatpp::List<oatpp::String>::createShared();
+        return config;
+    }
+
+    static void applyDefaults(const oatpp::Object<ConfigDto>& config) {
+        if (!config) return;
+        if (!config->title) config->title = "osxmon dashboard";
+        if (!config->pollingIntervalMs) config->pollingIntervalMs = 1000;
+        if (!config->enableCpu) config->enableCpu = true;
+        if (!config->enableMemory) config->enableMemory = true;
+        if (!config->enableDisk) config->enableDisk = true;
+        if (!config->enableNetwork) config->enableNetwork = true;
+        if (!config->enableProcesses) config->enableProcesses = true;
+        if (!config->maxProcesses) config->maxProcesses = 10;
+        if (!config->monitoredProcesses) config->monitoredProcesses = oatpp::List<oatpp::String>::createShared();
+    }
+
 public:
-    MonitorController(OATPP_COMPONENT(std::shared_ptr<oatpp::data::mapping::ObjectMapper>, apiObjectMapper))
+    MonitorController(
+        OATPP_COMPONENT(std::shared_ptr<oatpp::data::mapping::ObjectMapper>, apiObjectMapper),
+        const oatpp::Object<ConfigDto>& initialConfig = nullptr
+    )
         : oatpp::web::server::api::ApiController(apiObjectMapper)
     {
         m_monitorService = std::make_shared<MonitorService>();
-        
-        // Initialize default configuration
-        m_config = ConfigDto::createShared();
-        m_config->pollingIntervalMs = 1000;
-        m_config->enableCpu = true;
-        m_config->enableMemory = true;
-        m_config->enableDisk = true;
-        m_config->enableNetwork = true;
-        m_config->enableProcesses = true;
-        m_config->maxProcesses = 10;
+
+        m_config = initialConfig ? initialConfig : createDefaultConfig();
+        applyDefaults(m_config);
     }
 
     static std::shared_ptr<MonitorController> createShared(
         OATPP_COMPONENT(std::shared_ptr<oatpp::data::mapping::ObjectMapper>, apiObjectMapper)
     ) {
         return std::make_shared<MonitorController>(apiObjectMapper);
+    }
+
+    static std::shared_ptr<MonitorController> createSharedWithConfig(
+        const oatpp::Object<ConfigDto>& initialConfig
+    ) {
+        OATPP_COMPONENT(std::shared_ptr<oatpp::data::mapping::ObjectMapper>, apiObjectMapper);
+        return std::make_shared<MonitorController>(apiObjectMapper, initialConfig);
     }
 
     ENDPOINT_INFO(getMetrics) {
@@ -70,9 +100,14 @@ public:
     }
     ENDPOINT("POST", "/api/config", updateConfig, BODY_DTO(Object<ConfigDto>, configDto)) {
         std::lock_guard<std::mutex> lock(m_configMutex);
-        // Make sure fields are populated safely
-        if (!configDto->pollingIntervalMs) configDto->pollingIntervalMs = 1000;
-        if (configDto->maxProcesses == nullptr) configDto->maxProcesses = 10;
+        // Preserve startup configured process watch-list unless explicitly provided.
+        if (!configDto->title && m_config) {
+            configDto->title = m_config->title;
+        }
+        if (!configDto->monitoredProcesses && m_config) {
+            configDto->monitoredProcesses = m_config->monitoredProcesses;
+        }
+        applyDefaults(configDto);
         
         m_config = configDto;
         return createDtoResponse(Status::CODE_200, m_config);

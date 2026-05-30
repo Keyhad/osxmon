@@ -313,6 +313,21 @@ public:
                 std::unordered_map<pid_t, std::chrono::steady_clock::time_point> nextProcTimesNow;
                 std::vector<oatpp::Object<ProcessMetricsDto>> procList;
 
+                std::vector<std::string> monitoredNames;
+                if (config->monitoredProcesses && !config->monitoredProcesses->empty()) {
+                    for (auto it = config->monitoredProcesses->begin(); it != config->monitoredProcesses->end(); ++it) {
+                        const oatpp::String& name = *it;
+                        if (name) {
+                            std::string lowered = name->c_str();
+                            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                                           [](unsigned char c) { return (char)std::tolower(c); });
+                            if (!lowered.empty()) {
+                                monitoredNames.push_back(lowered);
+                            }
+                        }
+                    }
+                }
+
                 for (int i = 0; i < num_pids; ++i) {
                     pid_t pid = pids[i];
                     if (pid <= 0) continue;
@@ -324,6 +339,23 @@ public:
                         proc_name(pid, name_buf, sizeof(name_buf));
                         std::string pname(name_buf);
                         if (pname.empty()) pname = "Unknown";
+
+                        if (!monitoredNames.empty()) {
+                            std::string processLower = pname;
+                            std::transform(processLower.begin(), processLower.end(), processLower.begin(),
+                                           [](unsigned char c) { return (char)std::tolower(c); });
+
+                            bool matched = false;
+                            for (const auto& target : monitoredNames) {
+                                if (processLower == target) {
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            if (!matched) {
+                                continue;
+                            }
+                        }
 
                         // CPU nanoseconds (user + system)
                         uint64_t cur_proc_time = taskInfo.pti_total_user + taskInfo.pti_total_system;

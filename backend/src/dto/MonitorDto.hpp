@@ -63,6 +63,7 @@ class ProcessMetricsDto : public oatpp::DTO {
 
 class ConfigDto : public oatpp::DTO {
   DTO_INIT(ConfigDto, DTO)
+  DTO_FIELD(String, title);
   DTO_FIELD(Int32, pollingIntervalMs);
   DTO_FIELD(Boolean, enableCpu);
   DTO_FIELD(Boolean, enableMemory);
@@ -70,6 +71,7 @@ class ConfigDto : public oatpp::DTO {
   DTO_FIELD(Boolean, enableNetwork);
   DTO_FIELD(Boolean, enableProcesses);
   DTO_FIELD(Int32, maxProcesses);
+  DTO_FIELD(List<String>, monitoredProcesses);
 };
 
 class MetricsResponseDto : public oatpp::DTO {

@@ -1,0 +1,20 @@
+# osxmon backend startup config template
+# Start with:
+#   ./.venv/bin/invoke start --config osxmon.config.yml
+
+title: "OSXMon 1.0.0"
+
+config:
+  pollingIntervalMs: 1000
+  enableCpu: true
+  enableMemory: true
+  enableDisk: true
+  enableNetwork: true
+  enableProcesses: true
+  maxProcesses: 15
+
+monitoredProcesses:
+  - orbstack
+  - finder
+  - Google Chrome
+  - osxmon_server

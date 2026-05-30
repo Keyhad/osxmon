@@ -28,6 +28,14 @@
   gap: 16px;
 }
 
+@media (max-width: 640px) {
+  .settingRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
 .settingLabel {
   display: flex;
   flex-direction: column;
@@ -54,6 +62,12 @@
   outline: none;
 }
 
+@media (max-width: 640px) {
+  .slider {
+    width: min(180px, 52vw);
+  }
+}
+
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -71,6 +85,13 @@
   font-weight: 600;
   min-width: 48px;
   text-align: right;
+}
+
+@media (max-width: 640px) {
+  .sliderValue {
+    text-align: left;
+    min-width: 0;
+  }
 }
 
 /* Toggle Switch Style */

@@ -203,7 +203,7 @@ export default function Dashboard() {
       {/* 1. Header Row */}
       <header className={styles.header}>
         <div className={styles.titleArea}>
-          <h1>osxmon dashboard</h1>
+          <h1>{config.title || 'osxmon dashboard'}</h1>
           <p>Native performance and system resource telemetries</p>
         </div>
         <div className={`${styles.statusIndicator} ${isConnected ? styles.online : ''}`}>
@@ -213,18 +213,7 @@ export default function Dashboard() {
       </header>
 
       {!isConnected && (
-        <div style={{
-          background: 'rgba(255, 77, 106, 0.08)',
-          border: '1px solid rgba(255, 77, 106, 0.3)',
-          borderRadius: '12px',
-          padding: '16px',
-          color: 'var(--color-disk)',
-          fontSize: '0.9rem',
-          fontWeight: 500,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
+        <div className={styles.offlineAlert}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
           </svg>
@@ -261,7 +250,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 {metrics?.cpu ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className={styles.metricStack}>
                     <Gauge
                       value={metrics.cpu.user + metrics.cpu.system}
                       title="CPU"
@@ -275,7 +264,7 @@ export default function Dashboard() {
                         </svg>
                       }
                     />
-                    <div style={{ marginTop: 8 }}>
+                    <div className={styles.chartWrap}>
                       <HistoryChart
                         history={cpuHistory}
                         color="var(--color-cpu)"
@@ -327,7 +316,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 {metrics?.memory ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className={styles.metricStack}>
                     <Gauge
                       value={(metrics.memory.used / metrics.memory.total) * 100}
                       title="RAM"
@@ -341,7 +330,7 @@ export default function Dashboard() {
                         </svg>
                       }
                     />
-                    <div style={{ marginTop: 8 }}>
+                    <div className={styles.chartWrap}>
                       <HistoryChart
                         history={memoryHistory}
                         color="var(--color-memory)"
@@ -360,7 +349,7 @@ export default function Dashboard() {
           </div>
 
           {/* Disks & Network Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div className={styles.secondaryRow}>
             
             {/* Storage Card */}
             {config.enableDisk && (

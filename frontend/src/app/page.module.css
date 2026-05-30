@@ -113,6 +113,13 @@
   top: 24px;
 }
 
+@media (max-width: 1024px) {
+  .sidebarCol {
+    position: static;
+    top: auto;
+  }
+}
+
 /* Row of Main Gauges */
 .gaugesRow {
   display: grid;
@@ -138,6 +145,13 @@
   transition: border-color 0.2s, background-color 0.2s;
 }
 
+@media (max-width: 640px) {
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+}
+
 .card:hover {
   border-color: var(--border-color-hover);
   background: var(--bg-card-hover);
@@ -148,6 +162,14 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .cardHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
 }
 
 .cardTitle {
@@ -225,6 +247,14 @@
   border: 1px solid rgba(255, 255, 255, 0.02);
 }
 
+@media (max-width: 640px) {
+  .netItem {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+}
+
 .netName {
   font-family: var(--font-mono);
   font-weight: 600;
@@ -271,6 +301,56 @@
   border-radius: 20px;
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .cpuTempBadge {
+    font-size: 0.72rem;
+    padding: 2px 7px;
+  }
+}
+
+.offlineAlert {
+  background: rgba(255, 77, 106, 0.08);
+  border: 1px solid rgba(255, 77, 106, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--color-disk);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .offlineAlert {
+    align-items: flex-start;
+    font-size: 0.8rem;
+    padding: 12px;
+  }
+}
+
+.metricStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chartWrap {
+  margin-top: 8px;
+}
+
+.secondaryRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .secondaryRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Per-core load grid */

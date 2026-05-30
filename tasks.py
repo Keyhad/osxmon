@@ -2,8 +2,14 @@ import os
 import sys
 import time
 import signal
+import re
 import subprocess
 from invoke import task
+
+
+def run_no_stdin(c, command, **kwargs):
+    """Run shell commands without stdin forwarding to avoid invoke/Python 3.14 stdin thread crashes."""
+    return c.run(command, in_stream=False, **kwargs)
 
 # Paths
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -38,15 +44,15 @@ def clean(c, backend=False, frontend=False, logs=True):
         # Clean backend CMake build directory
         backend_build = os.path.join(BACKEND_DIR, 'build')
         if os.path.exists(backend_build):
-            c.run(f"rm -rf {backend_build}")
+            run_no_stdin(c, f"rm -rf {backend_build}")
             print("  ✓ Cleaned backend temp build directory.")
 
         # Clean output and test folders (excluding log directory)
         if os.path.exists(OUT_DIR):
-            c.run(f"rm -rf {OUT_DIR}")
+            run_no_stdin(c, f"rm -rf {OUT_DIR}")
             print("  ✓ Cleaned backend build output directory (_build/out).")
         if os.path.exists(TEST_DIR):
-            c.run(f"rm -rf {TEST_DIR}")
+            run_no_stdin(c, f"rm -rf {TEST_DIR}")
             print("  ✓ Cleaned backend test output directory (_build/test).")
 
     # Clean frontend-specific cache/modules
@@ -54,21 +60,21 @@ def clean(c, backend=False, frontend=False, logs=True):
         next_dir = os.path.join(FRONTEND_DIR, '.next')
         node_dir = os.path.join(FRONTEND_DIR, 'node_modules')
         if os.path.exists(next_dir):
-            c.run(f"rm -rf {next_dir}")
+            run_no_stdin(c, f"rm -rf {next_dir}")
             print("  ✓ Cleaned frontend Next.js cache (.next).")
         if os.path.exists(node_dir):
-            c.run(f"rm -rf {node_dir}")
+            run_no_stdin(c, f"rm -rf {node_dir}")
             print("  ✓ Cleaned frontend node_modules.")
 
     # Clean logs if specified
     if logs:
         if os.path.exists(LOG_DIR):
-            c.run(f"rm -rf {LOG_DIR}")
+            run_no_stdin(c, f"rm -rf {LOG_DIR}")
             print("  ✓ Cleaned log directory (_build/log).")
 
     # Clean root _build if it ends up completely empty
     if os.path.exists(BUILD_DIR) and not os.listdir(BUILD_DIR):
-        c.run(f"rm -rf {BUILD_DIR}")
+        run_no_stdin(c, f"rm -rf {BUILD_DIR}")
 
     print("✓ Project cleaned successfully.")
 
@@ -97,9 +103,9 @@ def build(c, backend=False, frontend=False):
         
         with c.cd(BACKEND_DIR):
             print(f"  - Running CMake configure... (logging to _build/log/build_backend_configure.log)")
-            c.run(f"cmake -B build -S . > {cfg_log} 2>&1")
+            run_no_stdin(c, f"cmake -B build -S . > {cfg_log} 2>&1")
             print(f"  - Compiling C++ binary...     (logging to _build/log/build_backend_compile.log)")
-            c.run(f"cmake --build build -j$(sysctl -n hw.ncpu) > {compile_log} 2>&1")
+            run_no_stdin(c, f"cmake --build build -j$(sysctl -n hw.ncpu) > {compile_log} 2>&1")
         
         # Check if build was successful and placed in _build/out
         binary_path = os.path.join(OUT_DIR, 'osxmon_server')
@@ -114,7 +120,7 @@ def build(c, backend=False, frontend=False):
         frontend_log = os.path.join(LOG_DIR, 'build_frontend.log')
         print(f"\nBuilding frontend Next.js Docker image... (logging to _build/log/build_frontend.log)")
         with c.cd(ROOT_DIR):
-            c.run(f"docker compose build > {frontend_log} 2>&1")
+            run_no_stdin(c, f"docker compose build > {frontend_log} 2>&1")
         print("  ✓ Frontend Docker image built successfully.")
 
     print("\n🎉 Build complete! Run 'inv start' to launch the dashboard.")
@@ -148,8 +154,9 @@ def rebuild(c, backend=False, frontend=False):
         "Log level for the C++ backend: verbose, debug, info, warning, error  "
         "[default: info]. Use 'verbose' to see all request/SMC/startup output in backend.log."
     ),
+    'config': "Optional path to a YAML startup config file (for process watch-list and telemetry defaults).",
 })
-def start(c, verbose=False, log_level='info'):
+def start(c, verbose=False, log_level='info', config=None):
     """Start native C++ backend and containerized frontend"""
     print("🚀 Starting osxmon services...")
 
@@ -181,6 +188,9 @@ def start(c, verbose=False, log_level='info'):
 
         # Build executable arguments
         args = [binary_path, '--log-level', effective_level]
+        if config:
+            args.extend(['--config', os.path.abspath(config)])
+            print(f"    • Startup config: {os.path.abspath(config)}")
 
         with open(LOG_FILE, 'w') as log:
             # Spawn in a separate process group to daemonize
@@ -198,7 +208,7 @@ def start(c, verbose=False, log_level='info'):
 
     # 2. Start Frontend Docker Container
     print("  - Launching Next.js frontend via Docker Compose...")
-    c.run("docker compose up -d")
+    run_no_stdin(c, "docker compose up -d")
     print("  ✓ Frontend container started successfully.")
 
     # 3. Print URLs
@@ -216,7 +226,7 @@ def stop(c):
 
     # 1. Stop Frontend container
     print("  - Stopping Next.js Docker container...")
-    c.run("docker compose down")
+    run_no_stdin(c, "docker compose down")
     print("  ✓ Frontend container stopped.")
 
     # 2. Stop C++ Backend
@@ -312,7 +322,7 @@ def test(c):
             print(f"\n🏃 Running test suite: {test_bin}... (piping logs to _build/log/test_{test_bin}.log)")
             
             # Redirect stdout & stderr to the log file
-            res = c.run(f"{path} > {log_path} 2>&1", warn=True)
+            res = run_no_stdin(c, f"{path} > {log_path} 2>&1", warn=True)
             if res.failed:
                 print(f"  ❌ Test suite {test_bin} failed! Check logs: {log_path}")
                 failed = True
@@ -330,14 +340,51 @@ def test(c):
 @task(name='help')
 def help_task(c, task_name=None):
     """List all tasks or show help for a specific task. Usage: inv help [--task-name <task>]"""
+    def extract_task_options(name):
+        result = subprocess.run(
+            [sys.argv[0], '--help', name],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            return []
+
+        options = []
+        in_options = False
+        for line in result.stdout.splitlines():
+            stripped = line.strip()
+            if stripped == 'Options:':
+                in_options = True
+                continue
+
+            if not in_options:
+                continue
+
+            if not stripped:
+                if options:
+                    break
+                continue
+
+            # Option declaration lines start with short/long flags.
+            if re.match(r'^\s+-', line):
+                option_part = re.split(r'\s{2,}', stripped, maxsplit=1)[0]
+                options.append(option_part)
+
+        return options
+
     if task_name:
-        c.run(f"{sys.argv[0]} --help {task_name}")
+        run_no_stdin(c, f"{sys.argv[0]} --help {task_name}")
     else:
         print("\n🛠️  osxmon Orchestration CLI Help")
         print("================================")
         print("To run a task, use: inv <task> [options]")
         print("\nAvailable Tasks:")
-        c.run(f"{sys.argv[0]} --list")
+        run_no_stdin(c, f"{sys.argv[0]} --list")
+        print("\nTask Options:")
+        for name in ['build', 'clean', 'help', 'rebuild', 'start', 'status', 'stop', 'test']:
+            options = extract_task_options(name)
+            option_text = ', '.join(options) if options else '(no options)'
+            print(f"  {name}: {option_text}")
         print("\nFor help on a specific task, run:")
         print("  inv help --task-name <task_name>")
         print("  or use invoke's built-in flag: invoke --help <task_name>\n")

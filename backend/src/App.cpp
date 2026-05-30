@@ -8,9 +8,156 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <stdexcept>
+#include <vector>
 
 #include <chrono>
 #include <mutex>
+
+namespace {
+
+std::string trim(const std::string& s) {
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) start++;
+    size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) end--;
+    return s.substr(start, end - start);
+}
+
+std::string stripQuotes(const std::string& input) {
+    if (input.size() >= 2) {
+        if ((input.front() == '\'' && input.back() == '\'') ||
+                (input.front() == '"' && input.back() == '"')) {
+            return input.substr(1, input.size() - 2);
+        }
+    }
+    return input;
+}
+
+bool parseBool(const std::string& value, bool& out) {
+    std::string lowered = value;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lowered == "true") {
+        out = true;
+        return true;
+    }
+    if (lowered == "false") {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+void applyYamlConfigEntry(const oatpp::Object<ConfigDto>& config, const std::string& key, const std::string& rawValue) {
+    const std::string value = trim(rawValue);
+
+    if (key == "pollingIntervalMs") {
+        config->pollingIntervalMs = std::stoi(value);
+        return;
+    }
+    if (key == "maxProcesses") {
+        config->maxProcesses = std::stoi(value);
+        return;
+    }
+
+    bool parsedBool = false;
+    bool boolValue = false;
+    if (parseBool(value, boolValue)) {
+        parsedBool = true;
+    }
+    if (!parsedBool) {
+        return;
+    }
+
+    if (key == "enableCpu") config->enableCpu = boolValue;
+    else if (key == "enableMemory") config->enableMemory = boolValue;
+    else if (key == "enableDisk") config->enableDisk = boolValue;
+    else if (key == "enableNetwork") config->enableNetwork = boolValue;
+    else if (key == "enableProcesses") config->enableProcesses = boolValue;
+}
+
+oatpp::Object<ConfigDto> loadConfigFromYaml(const std::string& configPath) {
+    std::ifstream input(configPath);
+    if (!input.is_open()) {
+        throw std::runtime_error("Unable to open config file: " + configPath);
+    }
+
+    auto config = ConfigDto::createShared();
+    config->title = "osxmon dashboard";
+    config->pollingIntervalMs = 1000;
+    config->enableCpu = true;
+    config->enableMemory = true;
+    config->enableDisk = true;
+    config->enableNetwork = true;
+    config->enableProcesses = true;
+    config->maxProcesses = 10;
+    config->monitoredProcesses = oatpp::List<oatpp::String>::createShared();
+
+    enum class Section {
+        None,
+        Config,
+        MonitoredProcesses
+    };
+    Section section = Section::None;
+
+    std::string line;
+    while (std::getline(input, line)) {
+        const std::size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+        }
+        if (trim(line).empty()) {
+            continue;
+        }
+
+        const bool topLevel = line.find_first_not_of(" \t") == 0;
+        const std::string trimmedLine = trim(line);
+
+        if (topLevel) {
+            if (trimmedLine.rfind("title:", 0) == 0) {
+                std::string value = trim(trimmedLine.substr(std::string("title:").size()));
+                value = stripQuotes(value);
+                if (!value.empty()) {
+                    config->title = value.c_str();
+                }
+                section = Section::None;
+            } else if (trimmedLine == "config:") {
+                section = Section::Config;
+            } else if (trimmedLine == "monitoredProcesses:") {
+                section = Section::MonitoredProcesses;
+            } else {
+                section = Section::None;
+            }
+            continue;
+        }
+
+        if (section == Section::Config) {
+            const std::size_t sep = trimmedLine.find(':');
+            if (sep == std::string::npos) {
+                continue;
+            }
+            const std::string key = trim(trimmedLine.substr(0, sep));
+            const std::string value = trim(trimmedLine.substr(sep + 1));
+            if (!key.empty() && !value.empty()) {
+                applyYamlConfigEntry(config, key, value);
+            }
+        } else if (section == Section::MonitoredProcesses) {
+            if (!trimmedLine.empty() && trimmedLine[0] == '-') {
+                std::string processName = trim(trimmedLine.substr(1));
+                processName = stripQuotes(processName);
+                if (!processName.empty()) {
+                    config->monitoredProcesses->push_back(processName.c_str());
+                }
+            }
+        }
+    }
+
+    return config;
+}
+
+} // namespace
 
 class AppLogger : public oatpp::base::Logger {
 private:
@@ -91,7 +238,7 @@ void setLogLevel(const std::string& level) {
     }
 }
 
-void run(const std::string& logLevel) {
+void run(const std::string& logLevel, const oatpp::Object<ConfigDto>& initialConfig = nullptr) {
   // 1. Initialize components
   AppComponent components;
 
@@ -102,7 +249,9 @@ void run(const std::string& logLevel) {
   OATPP_COMPONENT(std::shared_ptr<oatpp::web::server::HttpRouter>, router);
 
   // 4. Create and register Monitor Controller
-  auto monitorController = MonitorController::createShared();
+    auto monitorController = initialConfig
+            ? MonitorController::createSharedWithConfig(initialConfig)
+            : MonitorController::createShared();
   router->addController(monitorController);
 
   // 5. Create and register Swagger Controller
@@ -134,6 +283,7 @@ int main(int argc, char* argv[]) {
   oatpp::base::Environment::init(std::make_shared<AppLogger>());
 
   std::string logLevel = "info";
+  std::string configPath;
   for (int i = 1; i < argc; ++i) {
       std::string arg = argv[i];
       if (arg == "-v" || arg == "--verbose") {
@@ -141,10 +291,24 @@ int main(int argc, char* argv[]) {
       } else if (arg == "--log-level" && i + 1 < argc) {
           logLevel = argv[++i];
           std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), [](unsigned char c){ return std::tolower(c); });
+      } else if (arg == "--config" && i + 1 < argc) {
+          configPath = argv[++i];
       }
   }
 
-  run(logLevel);
+  oatpp::Object<ConfigDto> initialConfig;
+  if (!configPath.empty()) {
+      try {
+          initialConfig = loadConfigFromYaml(configPath);
+          OATPP_LOGI("Server", "Loaded startup config from %s", configPath.c_str());
+      } catch (const std::exception& ex) {
+          OATPP_LOGE("Server", "Failed to load --config file: %s", ex.what());
+          oatpp::base::Environment::destroy();
+          return 1;
+      }
+  }
+
+  run(logLevel, initialConfig);
 
   oatpp::base::Environment::destroy();
   return 0;

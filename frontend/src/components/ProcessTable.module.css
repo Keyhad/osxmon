@@ -12,6 +12,14 @@
   gap: 16px;
 }
 
+@media (max-width: 640px) {
+  .tableHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+}
+
 .tableTitle {
   font-size: 1.1rem;
   font-weight: 700;
@@ -25,6 +33,13 @@
   position: relative;
   flex: 1;
   max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .searchWrapper {
+    max-width: none;
+    width: 100%;
+  }
 }
 
 .searchInput {
@@ -45,6 +60,7 @@
 
 .processTable {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -77,6 +93,14 @@
   font-size: 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .processTable th,
+  .processTable td {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 .processRow {
